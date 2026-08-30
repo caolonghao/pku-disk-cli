@@ -1,0 +1,4 @@
+interface:
+  display_name: "PKU Disk"
+  short_description: "Transfer files with PKU AnyShare storage"
+  default_prompt: "Use $pku-disk to inspect or transfer files in my PKU disk."
