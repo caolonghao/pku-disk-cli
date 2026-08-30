@@ -1,9 +1,12 @@
 ---
 name: pku-disk
-description: Use the pku-disk CLI to inspect, upload, or download files in the user's PKU AnyShare storage. Apply when a task mentions the PKU disk, 北大网盘, disk.pku.edu.cn, or moving artifacts to or from that storage.
+description: Use the pku-disk CLI only when the user explicitly names 北大网盘, PKU Disk, disk.pku.edu.cn, PKU AnyShare, or clearly asks to transfer something to or from that specific service. Do not invoke for generic uploads, downloads, cloud storage, local files, or other network disks.
 ---
 
 # PKU Disk
+
+Load this skill only for an explicit PKU disk request. A generic request to
+upload, download, sync, or manage files is not sufficient.
 
 Use `pku-disk` rather than browser automation for file operations on the user's
 PKU AnyShare storage.
