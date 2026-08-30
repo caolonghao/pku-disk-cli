@@ -39,16 +39,38 @@ run the command again when the server reports expiration.
 pku-disk ls /
 pku-disk tree '/LLM Test'
 pku-disk stat '/model.pt' --json
+pku-disk quota --json
+pku-disk search 'report' --type file --json
 pku-disk mkdir -p '/Agent Uploads/run-001'
 pku-disk put ./result.zip '/Agent Uploads/run-001' --json
+pku-disk put ./results '/Agent Uploads/run-001' --json
 pku-disk get '/model.pt' ./downloads/
+pku-disk get '/Agent Uploads/run-001/results' ./downloads/
 ```
 
 All inspection commands support `--json`. Output data goes to stdout and errors
 go to stderr, with exit code `0` for success and non-zero for failure.
 
-Uploads refuse same-name conflicts by default. Use `--rename-on-conflict` to
-keep both files. This initial release intentionally has no delete command.
+File and directory transfers are recursive. Uploads larger than 16 MiB use
+4 MiB multipart chunks and automatically resume completed chunks after an
+interruption. Uploads refuse same-name conflicts by default; use
+`--rename-on-conflict` to keep both items.
+
+## Manage files and the recycle bin
+
+```bash
+pku-disk rename '/Agent Uploads/old.txt' 'new.txt'
+pku-disk mv '/Agent Uploads/new.txt' '/Archive'
+pku-disk cp '/Archive/new.txt' '/Agent Uploads'
+pku-disk rm '/Agent Uploads/new.txt' --yes
+pku-disk trash list --json
+pku-disk trash restore 'gns://EXACT_ITEM_ID' --yes
+pku-disk trash delete 'gns://EXACT_ITEM_ID' --yes
+```
+
+`rm` moves an item to AnyShare's recycle bin. Permanent deletion requires the
+stable item ID returned by a fresh `trash list` and cannot be undone. All three
+recycle-bin mutations require `--yes`.
 
 ## Share files and folders
 
@@ -105,4 +127,8 @@ user step; an Agent should never request or handle the PKU password.
 ## Scope
 
 The API paths used here were verified against PKU's AnyShare `7.0.6.3` web
-deployment. This is an independent client, not an official PKU or AISHU tool.
+deployment. Directory copies are executed deterministically as recursive
+server-side file copies because the deployment's asynchronous directory-copy
+queue can remain waiting indefinitely. A failed recursive copy may leave a
+partial destination directory that can be inspected and removed explicitly.
+This is an independent client, not an official PKU or AISHU tool.

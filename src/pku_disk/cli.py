@@ -15,6 +15,7 @@ from .auth import BrowserLoginError, browser_login
 from .client import AnyShareClient, AnyShareError, Entry
 from .credentials import CredentialError, delete_token, load_token, save_token
 from .sharing import ACCESSOR_TYPES, PERMISSION_CHOICES, SharingClient
+from .transfers import TransferClient
 
 
 def _size(value: int) -> str:
@@ -41,6 +42,12 @@ def _client() -> AnyShareClient:
 
 def _entry_output(entry: Entry) -> dict[str, Any]:
     return entry.as_dict()
+
+
+def _progress(completed: int, total: int, label: str) -> None:
+    percentage = completed / total * 100 if total else 100
+    end = "\r" if sys.stderr.isatty() and completed < total else "\n"
+    print(f"{label}: {percentage:6.2f}%", file=sys.stderr, end=end)
 
 
 def _add_permissions(parser: argparse.ArgumentParser) -> None:
@@ -99,21 +106,72 @@ def build_parser() -> argparse.ArgumentParser:
     stat.add_argument("path")
     stat.add_argument("--json", action="store_true")
 
+    quota = commands.add_parser("quota", help="Show storage quota and usage")
+    quota.add_argument("--json", action="store_true")
+
+    search = commands.add_parser("search", help="Search files and folders")
+    search.add_argument("query")
+    search.add_argument("--type", choices=("all", "file", "dir"), default="all")
+    search.add_argument("--limit", type=int, default=50)
+    search.add_argument("--json", action="store_true")
+
     mkdir = commands.add_parser("mkdir", help="Create a remote directory")
     mkdir.add_argument("path")
     mkdir.add_argument("-p", "--parents", action="store_true")
     mkdir.add_argument("--json", action="store_true")
 
-    put = commands.add_parser("put", help="Upload one local file")
+    put = commands.add_parser("put", help="Upload a local file or directory")
     put.add_argument("local", type=Path)
     put.add_argument("remote_dir", nargs="?", default="/")
     put.add_argument("--rename-on-conflict", action="store_true")
     put.add_argument("--json", action="store_true")
 
-    get = commands.add_parser("get", help="Download one remote file")
+    get = commands.add_parser("get", help="Download a remote file or directory")
     get.add_argument("remote")
     get.add_argument("destination", nargs="?", type=Path, default=Path("."))
     get.add_argument("--json", action="store_true")
+
+    rename = commands.add_parser("rename", help="Rename a remote item")
+    rename.add_argument("path")
+    rename.add_argument("new_name")
+    rename.add_argument("--json", action="store_true")
+
+    move = commands.add_parser("mv", help="Move a remote item")
+    move.add_argument("source")
+    move.add_argument("destination_dir")
+    move.add_argument("--rename-on-conflict", action="store_true")
+    move.add_argument("--json", action="store_true")
+
+    copy = commands.add_parser("cp", help="Copy a remote item")
+    copy.add_argument("source")
+    copy.add_argument("destination_dir")
+    copy.add_argument("--rename-on-conflict", action="store_true")
+    copy.add_argument("--json", action="store_true")
+
+    remove = commands.add_parser("rm", help="Move a remote item to the recycle bin")
+    remove.add_argument("path")
+    remove.add_argument("--yes", action="store_true", help="Confirm removal")
+    remove.add_argument("--json", action="store_true")
+
+    trash = commands.add_parser("trash", help="Inspect and manage the recycle bin")
+    trash_commands = trash.add_subparsers(dest="trash_command", required=True)
+    trash_list = trash_commands.add_parser("list", help="List recycled items")
+    trash_list.add_argument("--json", action="store_true")
+    trash_restore = trash_commands.add_parser(
+        "restore", help="Restore one recycled item"
+    )
+    trash_restore.add_argument("item_id")
+    trash_restore.add_argument("--rename-on-conflict", action="store_true")
+    trash_restore.add_argument("--yes", action="store_true", help="Confirm restoration")
+    trash_restore.add_argument("--json", action="store_true")
+    trash_delete = trash_commands.add_parser(
+        "delete", help="Permanently delete one recycled item"
+    )
+    trash_delete.add_argument("item_id")
+    trash_delete.add_argument(
+        "--yes", action="store_true", help="Confirm permanent deletion"
+    )
+    trash_delete.add_argument("--json", action="store_true")
 
     share = commands.add_parser(
         "share", help="Manage anonymous links and internal grants"
@@ -349,6 +407,24 @@ def run(args: argparse.Namespace) -> int:
             for item in entries:
                 print(f"{item.kind:<4} {_size(item.size):>10}  {item.name}")
         return 0
+    if args.command == "quota":
+        value = client.quota()
+        if args.json:
+            _emit(value, True)
+        else:
+            print(f"Used:      {_size(value['used'])}")
+            print(f"Available: {_size(value['available'])}")
+            print(f"Allocated: {_size(value['allocated'])}")
+            print(f"Usage:     {value['percent_used']:.2f}%")
+        return 0
+    if args.command == "search":
+        values = client.search(args.query, args.limit, args.type)
+        if args.json:
+            _emit([item.as_dict() for item in values], True)
+        else:
+            for item in values:
+                print(f"{item.kind:<4} {_size(item.size):>10}  {item.path}")
+        return 0
     if args.command == "tree":
         entries = list(client.iter_tree(args.path))
         if args.json:
@@ -373,12 +449,59 @@ def run(args: argparse.Namespace) -> int:
         _emit(_entry_output(item) if args.json else item.id, args.json)
         return 0
     if args.command == "put":
-        item = client.upload(args.local, args.remote_dir, args.rename_on_conflict)
-        _emit(_entry_output(item) if args.json else item.id, args.json)
+        values = TransferClient(client, _progress).upload(
+            args.local, args.remote_dir, args.rename_on_conflict
+        )
+        _emit(
+            values if args.json else "\n".join(item["id"] for item in values), args.json
+        )
         return 0
     if args.command == "get":
-        destination = client.download(args.remote, args.destination)
-        _emit({"path": str(destination)} if args.json else str(destination), args.json)
+        values = TransferClient(client, _progress).download(
+            args.remote, args.destination
+        )
+        _emit(
+            values if args.json else "\n".join(item["path"] for item in values),
+            args.json,
+        )
+        return 0
+    if args.command == "rename":
+        item = client.rename(args.path, args.new_name)
+        _emit(_entry_output(item) if args.json else item.id, args.json)
+        return 0
+    if args.command == "mv":
+        item = client.move(args.source, args.destination_dir, args.rename_on_conflict)
+        _emit(_entry_output(item) if args.json else item.id, args.json)
+        return 0
+    if args.command == "cp":
+        item = client.copy(args.source, args.destination_dir, args.rename_on_conflict)
+        _emit(_entry_output(item) if args.json else item.id, args.json)
+        return 0
+    if args.command == "rm":
+        if not args.yes:
+            raise AnyShareError("Refusing to remove without --yes")
+        value = client.remove(args.path)
+        _emit(value if args.json else value["status"], args.json)
+        return 0
+    if args.command == "trash":
+        if args.trash_command == "list":
+            value = client.list_trash()
+            if args.json:
+                _emit(value, True)
+            else:
+                for item in value["entries"]:
+                    print(
+                        f"{item['type']:<4} {_size(item['size']):>10}  "
+                        f"{item['name']}  {item['id']}"
+                    )
+            return 0
+        if not args.yes:
+            raise AnyShareError("Refusing to change the recycle bin without --yes")
+        if args.trash_command == "restore":
+            value = client.restore_trash(args.item_id, args.rename_on_conflict)
+        else:
+            value = client.delete_trash(args.item_id)
+        _emit(value if args.json else json.dumps(value, ensure_ascii=False), args.json)
         return 0
     return 2
 

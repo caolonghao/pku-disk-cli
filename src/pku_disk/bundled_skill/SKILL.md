@@ -22,6 +22,9 @@ Prefer machine-readable output for inspection:
 pku-disk ls / --json
 pku-disk tree '/remote/folder' --json
 pku-disk stat '/remote/file' --json
+pku-disk quota --json
+pku-disk search 'keyword' --type all --json
+pku-disk trash list --json
 pku-disk share policy --json
 pku-disk share list --json
 pku-disk share link list '/remote/item' --json
@@ -31,13 +34,30 @@ pku-disk share grants '/remote/item' --json
 For transfers:
 
 ```bash
-pku-disk get '/remote/file.zip' ./destination/
-pku-disk put ./artifact.zip '/remote/folder' --json
+pku-disk get '/remote/file-or-folder' ./destination/
+pku-disk put ./local-file-or-folder '/remote/folder' --json
 ```
 
 Remote paths are absolute and case-sensitive. Quote paths containing spaces or
 non-ASCII characters. Uploads reject same-name conflicts unless the user
-explicitly requests `--rename-on-conflict`.
+explicitly requests `--rename-on-conflict`. Large uploads are multipart and
+automatically resume completed parts after an interruption.
+
+For file management and the recycle bin:
+
+```bash
+pku-disk rename '/remote/old' 'new'
+pku-disk mv '/remote/item' '/remote/destination'
+pku-disk cp '/remote/item' '/remote/destination'
+pku-disk rm '/remote/item' --yes
+pku-disk trash list --json
+pku-disk trash restore 'gns://EXACT_ITEM_ID' --yes
+pku-disk trash delete 'gns://EXACT_ITEM_ID' --yes
+```
+
+Never guess a recycle-bin item ID. Obtain it from a fresh `trash list` and
+match the name and original path before restoring or deleting. `trash delete`
+is permanent and requires explicit authorization for that exact item.
 
 For anonymous links:
 
@@ -63,9 +83,9 @@ Never guess an accessor from an ambiguous search result. Ask the user to choose
 when multiple people, departments, or groups plausibly match.
 
 Listing, metadata inspection, and downloading are read-only. Creating folders
-and uploading files change cloud state: perform them only when the user's
-request authorizes that specific destination and content. Creating, updating,
-or revoking a link and adding or revoking an internal grant change external
-access: do them only when explicitly authorized for that exact item and
-recipient. Inspect policy and existing grants first. Revocation requires
-`--yes`. The CLI intentionally does not expose file deletion.
+and uploading, renaming, moving, copying, removing, or restoring items change
+cloud state: perform them only when the user's request authorizes that exact
+item, destination, and content. Creating, updating, or revoking a link and
+adding or revoking an internal grant change external access: do them only when
+explicitly authorized for that exact item and recipient. Inspect policy and
+existing grants first. Destructive commands require `--yes`.
