@@ -4,6 +4,7 @@ import queue
 import tempfile
 import time
 from pathlib import Path
+from urllib.parse import urlparse
 
 from .credentials import save_token
 
@@ -14,6 +15,19 @@ DEFAULT_URL = (
 
 class BrowserLoginError(RuntimeError):
     pass
+
+
+def _anyshare_token(request: object) -> str | None:
+    url = getattr(request, "url", "")
+    parsed = urlparse(url)
+    if parsed.hostname != "disk.pku.edu.cn" or not parsed.path.startswith("/api/"):
+        return None
+    headers = getattr(request, "headers", {})
+    authorization = headers.get("authorization", "")
+    if not authorization.lower().startswith("bearer "):
+        return None
+    token = authorization.split(None, 1)[1].strip()
+    return token or None
 
 
 def browser_login(url: str = DEFAULT_URL, timeout: int = 300) -> None:
@@ -27,10 +41,9 @@ def browser_login(url: str = DEFAULT_URL, timeout: int = 300) -> None:
     found: queue.Queue[str] = queue.Queue(maxsize=1)
 
     def inspect_request(request: object) -> None:
-        headers = getattr(request, "headers", {})
-        auth = headers.get("authorization", "")
-        if auth.lower().startswith("bearer ") and found.empty():
-            found.put(auth.split(None, 1)[1])
+        token = _anyshare_token(request)
+        if token and found.empty():
+            found.put(token)
 
     with (
         tempfile.TemporaryDirectory(prefix="pku-disk-login-") as profile,
