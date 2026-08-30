@@ -1,10 +1,16 @@
-from pku_disk.auth import _anyshare_token
+from pku_disk.auth import _anyshare_token, _successful_anyshare_token
 
 
 class Request:
     def __init__(self, url: str, authorization: str) -> None:
         self.url = url
         self.headers = {"authorization": authorization}
+
+
+class Response:
+    def __init__(self, status: int, request: Request) -> None:
+        self.status = status
+        self.request = request
 
 
 def test_accepts_only_anyshare_api_bearer_token() -> None:
@@ -26,3 +32,11 @@ def test_rejects_non_api_request() -> None:
         "https://disk.pku.edu.cn/anyshare/zh-cn/", "Bearer unrelated-token"
     )
     assert _anyshare_token(request) is None
+
+
+def test_accepts_token_only_after_successful_api_response() -> None:
+    request = Request(
+        "https://disk.pku.edu.cn/api/efast/v1/entry-doc-lib", "Bearer fresh-token"
+    )
+    assert _successful_anyshare_token(Response(200, request)) == "fresh-token"
+    assert _successful_anyshare_token(Response(401, request)) is None
