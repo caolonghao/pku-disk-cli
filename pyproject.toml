@@ -26,7 +26,7 @@ classifiers = [
 
 [project.optional-dependencies]
 browser = ["playwright>=1.48,<2"]
-test = ["pytest>=8,<9", "responses>=0.25,<1"]
+test = ["pytest>=8,<10", "responses>=0.25,<1"]
 
 [project.scripts]
 pku-disk = "pku_disk.cli:main"
