@@ -10,6 +10,8 @@ from urllib.parse import quote
 import requests
 from requests_toolbelt import MultipartEncoder
 
+from . import __version__
+
 DEFAULT_BASE_URL = "https://disk.pku.edu.cn"
 DEFAULT_ROOT_ID = "gns://43FC0471AD1C458B91E339426F7909C4"
 
@@ -66,7 +68,7 @@ class AnyShareClient:
                 "Authorization": f"Bearer {token}",
                 "Accept": "application/json",
                 "X-Language": "zh-cn",
-                "User-Agent": "pku-disk-cli/0.1.0",
+                "User-Agent": f"pku-disk-cli/{__version__}",
             }
         )
 

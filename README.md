@@ -50,6 +50,47 @@ go to stderr, with exit code `0` for success and non-zero for failure.
 Uploads refuse same-name conflicts by default. Use `--rename-on-conflict` to
 keep both files. This initial release intentionally has no delete command.
 
+## Share files and folders
+
+Inspect the deployment's sharing policy and existing shares:
+
+```bash
+pku-disk share policy --json
+pku-disk share list --json
+pku-disk share link list '/Agent Uploads' --json
+pku-disk share grants '/Agent Uploads' --json
+```
+
+Create and manage anonymous links:
+
+```bash
+pku-disk share link create '/Agent Uploads' \
+  --permission preview --permission download --expires-days 30 --json
+pku-disk share link create '/report.pdf' --password --max-uses 10 --json
+pku-disk share link update LINK_ID --expires-days 7 --json
+pku-disk share link revoke LINK_ID --yes
+```
+
+`--password` reads from a hidden prompt, or from
+`PKU_DISK_SHARE_PASSWORD` for non-interactive automation. Passwords are never
+included in CLI output. `--expires-days 0` means no expiration and
+`--max-uses -1` means unlimited use.
+
+Share with a PKU user, department, or group by first resolving its stable ID:
+
+```bash
+pku-disk share accessors '张三' --json
+pku-disk share grant '/Agent Uploads' \
+  --accessor-id USER_ID --accessor-type user \
+  --permission preview --permission download --json
+pku-disk share revoke '/Agent Uploads' \
+  --accessor-id USER_ID --accessor-type user --yes
+```
+
+The user-facing permissions are `preview`, `download`, and `upload`; `upload`
+maps to AnyShare's create and modify permissions. Grant and revoke operations
+preserve unrelated access-control entries. Revocation requires `--yes`.
+
 ## Install the Agent skill
 
 Install the bundled Codex skill after installing the CLI:
