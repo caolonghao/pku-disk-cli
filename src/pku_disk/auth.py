@@ -20,7 +20,10 @@ class BrowserLoginError(RuntimeError):
 def _anyshare_token(request: object) -> str | None:
     url = getattr(request, "url", "")
     parsed = urlparse(url)
-    if parsed.hostname != "disk.pku.edu.cn" or not parsed.path.startswith("/api/"):
+    is_folder_listing = parsed.path.startswith(
+        "/api/efast/v1/folders/"
+    ) and parsed.path.endswith("/sub_objects")
+    if parsed.hostname != "disk.pku.edu.cn" or not is_folder_listing:
         return None
     headers = getattr(request, "headers", {})
     authorization = headers.get("authorization", "")

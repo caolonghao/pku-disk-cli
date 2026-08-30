@@ -15,7 +15,8 @@ class Response:
 
 def test_accepts_only_anyshare_api_bearer_token() -> None:
     request = Request(
-        "https://disk.pku.edu.cn/api/efast/v1/entry-doc-lib", "Bearer anyshare-token"
+        "https://disk.pku.edu.cn/api/efast/v1/folders/gns%3A%2F%2FROOT/sub_objects",
+        "Bearer anyshare-token",
     )
     assert _anyshare_token(request) == "anyshare-token"
 
@@ -36,7 +37,15 @@ def test_rejects_non_api_request() -> None:
 
 def test_accepts_token_only_after_successful_api_response() -> None:
     request = Request(
-        "https://disk.pku.edu.cn/api/efast/v1/entry-doc-lib", "Bearer fresh-token"
+        "https://disk.pku.edu.cn/api/efast/v1/folders/gns%3A%2F%2FROOT/sub_objects",
+        "Bearer fresh-token",
     )
     assert _successful_anyshare_token(Response(200, request)) == "fresh-token"
     assert _successful_anyshare_token(Response(401, request)) is None
+
+
+def test_rejects_public_anyshare_api_even_when_successful() -> None:
+    request = Request(
+        "https://disk.pku.edu.cn/api/metadata/v1/ping", "Bearer stale-token"
+    )
+    assert _successful_anyshare_token(Response(200, request)) is None
