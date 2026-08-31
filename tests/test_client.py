@@ -33,6 +33,23 @@ def test_expired_token_has_actionable_error() -> None:
         AnyShareClient("expired").list_path("/")
 
 
+@responses.activate
+def test_expired_token_refreshes_once_and_retries() -> None:
+    url = "https://disk.pku.edu.cn/api/efast/v1/quota/user"
+    responses.get(url, status=401)
+    responses.get(url, json={"allocated": 100, "used": 25})
+    refreshed: list[bool] = []
+
+    def refresh() -> str:
+        refreshed.append(True)
+        return "fresh-token"
+
+    client = AnyShareClient("expired", token_refresher=refresh)
+    assert client.quota()["available"] == 75
+    assert refreshed == [True]
+    assert responses.calls[1].request.headers["Authorization"] == "Bearer fresh-token"
+
+
 def test_download_refuses_existing_destination(tmp_path: Path) -> None:
     destination = tmp_path / "existing.bin"
     destination.write_bytes(b"keep")

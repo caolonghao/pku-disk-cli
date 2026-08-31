@@ -11,10 +11,14 @@ upload, download, sync, or manage files is not sufficient.
 Use `pku-disk` rather than browser automation for file operations on the user's
 PKU AnyShare storage.
 
-Before the first operation, run `pku-disk auth status`. If authentication has
-expired, ask the user to run `pku-disk auth login` and complete PKU IAAA login in
-the opened browser. Never ask for, type, store, or transmit the user's PKU
-password.
+Before the first operation, run `pku-disk auth status`. The CLI automatically
+refreshes an expired AnyShare token from its dedicated saved PKU SSO browser
+session and may briefly open a Chrome window. If that session has also expired,
+ask the user to run `pku-disk auth login` and complete PKU IAAA login in the
+opened browser. Never
+ask for, type, store, or transmit the user's PKU password. Never run
+`auth forget-session` unless the user explicitly asks to remove saved login
+state.
 
 Prefer machine-readable output for inspection:
 

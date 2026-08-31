@@ -2,7 +2,7 @@
 
 Agent-friendly command-line access to Peking University's AnyShare deployment.
 It uses the same REST endpoints as the official web client and authenticates
-through PKU IAAA in a temporary browser session. Your PKU password is never
+through PKU IAAA in a dedicated browser profile. Your PKU password is never
 handled or stored by this CLI.
 
 ## Install
@@ -26,12 +26,20 @@ pku-disk auth import-token
 ```bash
 pku-disk auth login
 pku-disk auth status
+pku-disk auth refresh
 ```
 
-`auth login` launches a clean Chrome window. Complete PKU IAAA authentication
-yourself. The resulting AnyShare Bearer token is saved in macOS Keychain. On
-other systems it is stored in a mode-0600 config file. Tokens are short-lived;
-run the command again when the server reports expiration.
+`auth login` launches a dedicated Chrome profile. Complete PKU IAAA
+authentication yourself once. The profile retains PKU SSO cookies and browser
+storage in a mode-0700 state directory; it never records a password through the
+CLI. The resulting AnyShare Bearer token is saved in macOS Keychain. On other
+systems it is stored in a mode-0600 config file.
+
+When a token expires, normal commands automatically open that dedicated Chrome
+profile briefly, refresh the token from the retained SSO session, close the
+window, and retry once. Run `pku-disk auth login` again only after the PKU SSO
+session itself expires. Use `pku-disk auth forget-session --yes` to remove both
+the saved token and the dedicated browser profile.
 
 ## Use
 

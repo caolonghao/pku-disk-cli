@@ -11,7 +11,12 @@ from pathlib import Path
 from typing import Any
 
 from . import __version__
-from .auth import BrowserLoginError, browser_login
+from .auth import (
+    BrowserLoginError,
+    browser_login,
+    forget_browser_session,
+    refresh_browser_session,
+)
 from .client import AnyShareClient, AnyShareError, Entry
 from .credentials import CredentialError, delete_token, load_token, save_token
 from .sharing import ACCESSOR_TYPES, PERMISSION_CHOICES, SharingClient
@@ -37,7 +42,11 @@ def _emit(value: Any, as_json: bool) -> None:
 
 
 def _client() -> AnyShareClient:
-    return AnyShareClient(load_token())
+    try:
+        token = load_token()
+    except CredentialError:
+        token = refresh_browser_session()
+    return AnyShareClient(token, token_refresher=refresh_browser_session)
 
 
 def _entry_output(entry: Entry) -> dict[str, Any]:
@@ -83,7 +92,7 @@ def build_parser() -> argparse.ArgumentParser:
     auth = commands.add_parser("auth", help="Manage authentication")
     auth_commands = auth.add_subparsers(dest="auth_command", required=True)
     login = auth_commands.add_parser(
-        "login", help="Log in through PKU SSO in a temporary browser"
+        "login", help="Log in through PKU SSO in a dedicated browser profile"
     )
     login.add_argument(
         "--timeout", type=int, default=300, help="Login timeout in seconds"
@@ -91,8 +100,15 @@ def build_parser() -> argparse.ArgumentParser:
     auth_commands.add_parser(
         "import-token", help="Securely import an existing Bearer token"
     )
+    auth_commands.add_parser("refresh", help="Refresh the token from saved PKU SSO")
     auth_commands.add_parser("status", help="Test the saved token")
     auth_commands.add_parser("logout", help="Remove the saved token")
+    forget_session = auth_commands.add_parser(
+        "forget-session", help="Remove the dedicated browser SSO profile"
+    )
+    forget_session.add_argument(
+        "--yes", action="store_true", help="Confirm session removal"
+    )
 
     ls = commands.add_parser("ls", help="List a remote directory")
     ls.add_argument("path", nargs="?", default="/")
@@ -285,6 +301,10 @@ def run(args: argparse.Namespace) -> int:
             browser_login(timeout=args.timeout)
             print("Authentication token saved securely.")
             return 0
+        if args.auth_command == "refresh":
+            refresh_browser_session()
+            print("Authentication token refreshed from the saved PKU SSO session.")
+            return 0
         if args.auth_command == "import-token":
             token = getpass.getpass("AnyShare Bearer token: ")
             save_token(token.removeprefix("Bearer ").removeprefix("bearer "))
@@ -295,6 +315,19 @@ def run(args: argparse.Namespace) -> int:
                 "Authentication token removed."
                 if delete_token()
                 else "No saved token found."
+            )
+            return 0
+        if args.auth_command == "forget-session":
+            if not args.yes:
+                raise AnyShareError(
+                    "Refusing to remove the saved SSO session without --yes"
+                )
+            token_removed = delete_token()
+            session_removed = forget_browser_session()
+            print(
+                "Saved token and PKU SSO session removed."
+                if token_removed or session_removed
+                else "No saved token or PKU SSO session found."
             )
             return 0
         if args.auth_command == "status":

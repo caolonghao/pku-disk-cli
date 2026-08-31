@@ -30,3 +30,14 @@ def test_destructive_commands_require_confirmation(
     args = cli.build_parser().parse_args(arguments)
     with pytest.raises(AnyShareError, match=message):
         cli.run(args)
+
+
+def test_forget_session_requires_confirmation(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(
+        cli,
+        "forget_browser_session",
+        lambda: (_ for _ in ()).throw(AssertionError("must not remove session")),
+    )
+    args = cli.build_parser().parse_args(["auth", "forget-session"])
+    with pytest.raises(AnyShareError, match="without --yes"):
+        cli.run(args)

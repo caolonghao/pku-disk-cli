@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import os
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 from typing import Any
@@ -100,10 +100,12 @@ class AnyShareClient:
         base_url: str = DEFAULT_BASE_URL,
         root_id: str = DEFAULT_ROOT_ID,
         timeout: int = 60,
+        token_refresher: Callable[[], str] | None = None,
     ) -> None:
         self.base_url = base_url.rstrip("/")
         self.root_id = root_id
         self.timeout = timeout
+        self.token_refresher = token_refresher
         self.session = requests.Session()
         self.session.headers.update(
             {
@@ -119,6 +121,13 @@ class AnyShareClient:
         response = self.session.request(
             method, self.base_url + path, timeout=timeout, **kwargs
         )
+        if response.status_code == 401 and self.token_refresher is not None:
+            token_refresher, self.token_refresher = self.token_refresher, None
+            token = token_refresher()
+            self.session.headers["Authorization"] = f"Bearer {token}"
+            response = self.session.request(
+                method, self.base_url + path, timeout=timeout, **kwargs
+            )
         if response.status_code == 401:
             raise AnyShareError("Authentication expired. Run: pku-disk auth login")
         if not response.ok:

@@ -1,4 +1,12 @@
-from pku_disk.auth import _anyshare_token, _successful_anyshare_token
+from pathlib import Path
+
+from pku_disk.auth import (
+    _anyshare_token,
+    _prepare_profile,
+    _successful_anyshare_token,
+    browser_profile_path,
+    forget_browser_session,
+)
 
 
 class Request:
@@ -49,3 +57,14 @@ def test_rejects_public_anyshare_api_even_when_successful() -> None:
         "https://disk.pku.edu.cn/api/metadata/v1/ping", "Bearer stale-token"
     )
     assert _successful_anyshare_token(Response(200, request)) is None
+
+
+def test_browser_profile_is_private_and_removable(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.setenv("XDG_STATE_HOME", str(tmp_path))
+    profile = _prepare_profile()
+    assert profile == browser_profile_path()
+    assert profile.stat().st_mode & 0o777 == 0o700
+    (profile / "Cookies").write_text("session", encoding="utf-8")
+    assert forget_browser_session() is True
+    assert not profile.exists()
+    assert forget_browser_session() is False
